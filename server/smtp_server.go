@@ -59,6 +59,7 @@ type smtpSession struct {
 	backend *smtpBackend
 	conn    *smtp.Conn
 	topic   string
+	token   string
 	mu      sync.Mutex
 }
 
@@ -75,6 +76,7 @@ func (s *smtpSession) Mail(from string, opts *smtp.MailOptions) error {
 func (s *smtpSession) Rcpt(to string) error {
 	logem(s.conn).Field("smtp_rcpt_to", to).Debug("RCPT TO: %s", to)
 	return s.withFailCount(func() error {
+		token := ""
 		conf := s.backend.config
 		addressList, err := mail.ParseAddressList(to)
 		if err != nil {
@@ -86,18 +88,26 @@ func (s *smtpSession) Rcpt(to string) error {
 		if !strings.HasSuffix(to, "@"+conf.SMTPServerDomain) {
 			return errInvalidDomain
 		}
+		// remove @ntfy.sh from end of email
 		to = strings.TrimSuffix(to, "@"+conf.SMTPServerDomain)
 		if conf.SMTPServerAddrPrefix != "" {
 			if !strings.HasPrefix(to, conf.SMTPServerAddrPrefix) {
 				return errInvalidAddress
 			}
+			// remove ntfy- from beginning of email
 			to = strings.TrimPrefix(to, conf.SMTPServerAddrPrefix)
+		}
+		// if email contains token, split topic and token
+		if strings.Contains(to, "+") {
+			to = strings.Split(to, "+")[0]
+			token = strings.Split(to, "+")[1]
 		}
 		if !topicRegex.MatchString(to) {
 			return errInvalidTopic
 		}
 		s.mu.Lock()
 		s.topic = to
+		s.token = token
 		s.mu.Unlock()
 		return nil
 	})
@@ -170,6 +180,9 @@ func (s *smtpSession) publishMessage(m *message) error {
 	}
 	if m.Title != "" {
 		req.Header.Set("Title", m.Title)
+	}
+	if s.token != "" {
+		req.Header.Set("Token", s.token)
 	}
 	rr := httptest.NewRecorder()
 	s.backend.handler(rr, req)
