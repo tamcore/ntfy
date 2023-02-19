@@ -5,6 +5,10 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 jobs:
   release:
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       -
@@ -36,7 +40,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
       -
         name: Install dependencies
         run: make build-deps-ubuntu
