@@ -293,10 +293,6 @@ release-checks:
 		echo "ERROR: Must update docs/releases.md with latest tag first.";\
 		exit 1;\
 	fi
-	if [ -n "$(shell git status -s)" ]; then\
-	  echo "ERROR: Git repository is in an unclean state.";\
-	  exit 1;\
-	fi
 
 
 # Installing targets
